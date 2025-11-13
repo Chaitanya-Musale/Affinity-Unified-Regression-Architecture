@@ -86,101 +86,27 @@ These streams are integrated through:
 - **Fusion MLP**: Final integration of all streams
 - **KAN Regression Head**: Non-linear prediction layer
 
-### Architecture Diagram
+### Architecture Details
 
-The AURA architecture processes protein-ligand complexes through five parallel streams that are integrated via attention mechanisms:
+AURA integrates five complementary information streams:
 
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                          INPUTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**Ligand Representation**:
+- Multiple 3D conformers (5 per ligand) are processed through both 2D and 3D Graph Neural Networks to capture topology and geometry
+- Conformer attention mechanism selects relevant conformations based on protein context
+- ECFP (2048-bit Morgan fingerprints) provide traditional cheminformatics features
 
-        Ligand SMILES                    Protein PDB File
-               │                                │
-               └────────┬───────────────────────┘
-                        │
-                        ▼
+**Protein Representation**:
+- ESM-2 protein language model (frozen, pre-trained) extracts residue-level and global protein embeddings
+- Physics-informed GNN processes protein embeddings to model binding pocket dynamics
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                    FEATURE EXTRACTION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**Interaction Modeling**:
+- Hierarchical cross-attention mechanism models atom-level and pocket-level ligand-protein interactions
 
-    LIGAND SIDE                        PROTEIN SIDE
-    ───────────                        ────────────
-
-    5 Conformers ──┐                  ESM-2 PLM (frozen)
-         │         │                         │
-         ▼         ▼                         ▼
-    ┌────────────────┐              ┌─────────────────┐
-    │  2D-GNN  3D-GNN│              │ Residue Embeddings│
-    │  (topology +   │              │  (sequence info)  │
-    │   geometry)    │              └─────────────────┘
-    └────────────────┘                       │
-         │                                   ▼
-         │                          ┌─────────────────┐
-         │                          │  Physics-GNN    │
-         │                          │ (binding pocket)│
-         │                          └─────────────────┘
-         │                                   │
-         ▼                                   │
-    ┌────────────────┐                      │
-    │  Conformer     │◄─────────────────────┘
-    │  Attention     │  (protein context)
-    └────────────────┘
-         │
-         │
-    ECFP Fingerprint
-    (2048-bit Morgan)
-         │
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                    INTERACTION MODELING
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-                 ┌──────────────────────┐
-                 │ Hierarchical Cross-  │
-                 │    Attention         │
-                 │ (Ligand ↔ Protein)   │
-                 └──────────────────────┘
-                          │
-                          ▼
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                    MULTI-STREAM FUSION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-     Stream 1: Interaction features (from attention)
-     Stream 2: Protein global embedding
-     Stream 3: Ligand global pooling
-     Stream 4: Physics features
-     Stream 5: ECFP embedding
-                          │
-                          ▼
-                 ┌──────────────────────┐
-                 │   Fusion MLP         │
-                 │   (concatenate all)  │
-                 └──────────────────────┘
-                          │
-                          ▼
-                 ┌──────────────────────┐
-                 │    KAN Regression    │
-                 │       Head           │
-                 └──────────────────────┘
-                          │
-                          ▼
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                    ENSEMBLE PREDICTION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-              DL Prediction      XGBoost
-                  (w)           (1-w)
-                   │               │
-                   └───────┬───────┘
-                           ▼
-                   Final Affinity
-                    (-logKd/Ki)
-```
+**Final Prediction**:
+- Five streams (interaction features, protein embedding, ligand embedding, physics features, ECFP) are concatenated
+- Fusion MLP integrates multi-modal information
+- KAN (Kolmogorov-Arnold Network) regression head produces deep learning prediction
+- Ensemble combines deep learning prediction with XGBoost (trained on ECFP + DL features) using learnable weights
 
 ---
 
