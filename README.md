@@ -86,108 +86,100 @@ These streams are integrated through:
 - **Fusion MLP**: Final integration of all streams
 - **KAN Regression Head**: Non-linear prediction layer
 
-### Architecture Diagram (Conceptual)
+### Architecture Diagram
+
+The AURA architecture processes protein-ligand complexes through five parallel streams that are integrated via attention mechanisms:
 
 ```
-                         INPUT DATA (Pre-cached)
-        ┌──────────────────────┴───────────────────────┐
-        │                                              │
-   Ligand SMILES                                 Protein PDB
-        │                                              │
-        ▼                                              ▼
-┌───────────────┐                              ┌─────────────┐
-│  Conformer    │                              │   ESM-2     │
-│ Generation    │                              │     PLM     │
-│   (5 x 3D)    │                              │  (Frozen)   │
-└───────────────┘                              └─────────────┘
-        │                                              │
-        ├────────┬─────────┐                          ▼
-        │        │         │                  ┌────────────────┐
-        ▼        ▼         ▼                  │    Residue     │
-   ┌────────────────────────┐                │   Embeddings   │
-   │   2D GNN    3D GNN     │                │   + Global     │
-   │    (GAT)    (Radius)   │                └────────────────┘
-   │                        │                         │
-   │ (Same conformer input) │                         ▼
-   └────────────────────────┘                ┌────────────────┐
-        │        │                            │   Physics-     │
-        └────┬───┘                            │   Informed     │
-             │                                │      GNN       │
-   (Fuse 2D + 3D features)                    └────────────────┘
-             │                                         │
-             ▼                                         │
-   ┌──────────────────┐                               │
-   │   Conformer      │◄──────────────────────────────┘
-   │   Attention      │    (uses protein global embedding
-   │  (Weighted by    │     as attention context)
-   │   protein ctx)   │
-   └──────────────────┘
-             │
-             │                 ┌──────────────────────┐
-             │                 │  Residue Embeddings  │
-             │                 └──────────────────────┘
-             │                            │
-             └──────────┬─────────────────┘
-                        ▼
-              ┌─────────────────────┐
-              │  Hierarchical       │
-              │  Cross-Attention    │
-              │ (Ligand ↔ Protein)  │
-              └─────────────────────┘
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                          INPUTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        Ligand SMILES                    Protein PDB File
+               │                                │
+               └────────┬───────────────────────┘
                         │
                         ▼
-              ┌─────────────────────┐
-              │   Interaction       │
-              │   Output            │
-              └─────────────────────┘
-                        │
-         ┌──────────────┼───────────────┬─────────────┐
-         │              │               │             │
-         ▼              ▼               ▼             ▼
-   [Interaction]  [Protein     [Ligand Pool]  [Physics]
-    (context)      Global]                     (corr_features)
-                                                      │
-                                        ┌─────────────┘
-                                        │
-                                        ▼
-                              ┌─────────────────┐
-                              │  ECFP (2048)    │
-                              │  (Pre-cached)   │
-                              └─────────────────┘
-                                        │
-         ┌──────────────────────────────┴──────────────┐
-         │                                             │
-         └─────────────────┬───────────────────────────┘
-                           ▼
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    FEATURE EXTRACTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    LIGAND SIDE                        PROTEIN SIDE
+    ───────────                        ────────────
+
+    5 Conformers ──┐                  ESM-2 PLM (frozen)
+         │         │                         │
+         ▼         ▼                         ▼
+    ┌────────────────┐              ┌─────────────────┐
+    │  2D-GNN  3D-GNN│              │ Residue Embeddings│
+    │  (topology +   │              │  (sequence info)  │
+    │   geometry)    │              └─────────────────┘
+    └────────────────┘                       │
+         │                                   ▼
+         │                          ┌─────────────────┐
+         │                          │  Physics-GNN    │
+         │                          │ (binding pocket)│
+         │                          └─────────────────┘
+         │                                   │
+         ▼                                   │
+    ┌────────────────┐                      │
+    │  Conformer     │◄─────────────────────┘
+    │  Attention     │  (protein context)
+    └────────────────┘
+         │
+         │
+    ECFP Fingerprint
+    (2048-bit Morgan)
+         │
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    INTERACTION MODELING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
                  ┌──────────────────────┐
-                 │  5-Stream Fusion MLP │
-                 │   (Concat all 5)     │
+                 │ Hierarchical Cross-  │
+                 │    Attention         │
+                 │ (Ligand ↔ Protein)   │
                  └──────────────────────┘
-                           │
-                           ▼
+                          │
+                          ▼
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    MULTI-STREAM FUSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+     Stream 1: Interaction features (from attention)
+     Stream 2: Protein global embedding
+     Stream 3: Ligand global pooling
+     Stream 4: Physics features
+     Stream 5: ECFP embedding
+                          │
+                          ▼
                  ┌──────────────────────┐
-                 │     KAN Head         │
-                 │   (Regression)       │
+                 │   Fusion MLP         │
+                 │   (concatenate all)  │
                  └──────────────────────┘
-                           │
-                           ▼
+                          │
+                          ▼
                  ┌──────────────────────┐
-                 │   DL Prediction      │
+                 │    KAN Regression    │
+                 │       Head           │
                  └──────────────────────┘
-                           │
-              ┌────────────┴─────────────┐
-              ▼                          ▼
-        ┌──────────┐              ┌───────────┐
-        │    DL    │              │  XGBoost  │
-        │ (w * p1) │              │((1-w)*p2) │
-        └──────────┘              └───────────┘
-              │                          │
-              └──────────┬───────────────┘
-                         ▼
-                ┌─────────────────┐
-                │ Final Affinity  │
-                │  (-logKd/Ki)    │
-                └─────────────────┘
+                          │
+                          ▼
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    ENSEMBLE PREDICTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              DL Prediction      XGBoost
+                  (w)           (1-w)
+                   │               │
+                   └───────┬───────┘
+                           ▼
+                   Final Affinity
+                    (-logKd/Ki)
 ```
 
 ---
@@ -242,49 +234,17 @@ This approach provides realistic evaluation of model performance on truly unseen
 
 ## Training Strategy
 
-### Staged Training Approach
+AURA employs a **staged training approach** with three phases:
 
-AURA uses a **three-stage training strategy** to ensure stable learning:
+1. **Stage B - Head Training**: Regression heads are trained first with frozen backbone encoders to initialize prediction layers
+2. **Stage C - End-to-End Fine-tuning**: Full model is fine-tuned with learning rate warmup and L2 regularization to prevent overfitting
+3. **Ensemble Training**: XGBoost model is trained on ECFP features and deep learning embeddings, then ensemble weights are optimized
 
-#### Stage B: Head Training (50 epochs)
-- **Objective**: Train regression heads with frozen backbone
-- **Learning Rate**: 5e-4
-- **Normalization**: Train on z-score normalized affinity values
-- **Purpose**: Initialize prediction layers before full fine-tuning
-- **Early Stopping**: Patience of 10 epochs based on validation Pearson R
-
-#### Stage C: Full Fine-tuning (50 epochs)
-- **Objective**: Fine-tune entire model end-to-end
-- **Learning Rate**: 1e-4 with warmup (500 steps)
-- **Regularization**: L2 regularization towards initial weights (prevents catastrophic forgetting)
-- **Gradient Clipping**: Norm clipping at 1.0
-- **Effective Batch Size**: 64 (8 samples × 8 accumulation steps)
-
-#### XGBoost Training + Ensemble Tuning
-- **XGBoost Configuration**:
-  - 200 estimators, max depth 6
-  - Learning rate 0.1, subsample 0.8
-  - Trained on ECFP features + DL embeddings
-
-- **Ensemble Weight Tuning**:
-  - Learnable weight parameter (sigmoid-activated)
-  - Fine-tuned for 3 epochs on validation set
-  - Balances DL and XGBoost predictions
-
-### Normalization Strategy
-
-**Key Design Decision**: All training occurs on **z-score normalized affinity values**:
-
-```
-normalized_affinity = (affinity - mean) / std
-```
-
-**Benefits**:
-- Improved gradient flow during backpropagation
-- Faster convergence and better training stability
-- More consistent loss landscapes
-
-**Evaluation**: All metrics are reported on the **original scale** after denormalization, ensuring meaningful interpretation of results.
+**Key Technical Decisions**:
+- Training on z-score normalized affinity values for improved gradient flow and stability
+- All evaluation metrics reported on original scale for interpretability
+- Early stopping based on validation set Pearson R correlation
+- Mixed precision training for computational efficiency
 
 ---
 
