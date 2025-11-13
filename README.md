@@ -392,30 +392,6 @@ AURA achieves **competitive results** on all test sets, with performance metrics
 
 **Important Note**: These results are particularly competitive considering that **accuracy for nearly all models in the literature drops significantly when using similarity-aware evaluation splits** compared to traditional random splitting. Our similarity-aware approach prevents data leakage and provides a more realistic assessment of model generalization to novel protein-ligand complexes.
 
-### Training Outputs
-
-During training, AURA produces:
-
-1. **Model Checkpoints**:
-   - `stage_b_best.pt`: Best Stage B model
-   - `aura_final_best.pt`: Best Stage C model
-   - `aura_ensemble_final.pt`: Final ensemble model
-   - `xgboost_model.pkl`: Trained XGBoost model
-
-2. **Cached Data** (one-time computation):
-   - `all_conformers_multipath_v2.pkl`: Pre-computed conformers
-   - `all_ecfp_precomputed.pkl`: ECFP fingerprints
-   - `protein_tokens_multipath_v2.pkl`: Tokenized proteins
-   - `affinity_normalizer.pkl`: Normalization parameters
-
-3. **Training History**:
-   - `training_history.pkl`: Loss and metrics per epoch
-   - `all_test_results.json`: Comprehensive test set evaluation
-
-4. **Interpretability Visualizations**:
-   - `interpretability/*.png`: Example explanation dashboards
-
----
 
 ## Project Structure
 
@@ -486,12 +462,5 @@ Multi-level explanations from ensemble weights down to individual atoms provide 
 
 ## Acknowledgments
 
-This work leverages several open-source tools and pre-trained models:
 
-- **ESM-2**: Meta AI's protein language model
-- **PyTorch Geometric**: Graph neural network library
-- **RDKit**: Cheminformatics toolkit
-- **PDBbind**: Binding affinity database
-- **SHAP**: Explainable AI framework
-
-Special acknowledgment for the **similarity-aware data splits** which address a critical data leakage issue in binding affinity prediction benchmarks.
+Special acknowledgment for the **similarity-aware-evaluations** by Zhang et. al which address a critical data leakage issue in binding affinity prediction benchmarks.
