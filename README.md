@@ -89,73 +89,72 @@ These streams are integrated through:
 ### Architecture Diagram (Conceptual)
 
 ```
-INPUT LAYER
-═══════════════════════════════════════════════════════════════
-
-Ligand SMILES                                    Protein PDB
-     │                                                │
-     └──────────┬─────────────┐                      │
-                │             │                      │
-                ▼             ▼                      ▼
-    [Conformer Gen]    [ECFP Encoder]         [ESM-2 PLM]
-         │                   │                      │
-         ▼                   │                      ▼
-   5 Conformers              │              Residue Embeddings
-         │                   │                      │
-         └──────┬────────┘   │                      │
-                │            │                      │
-                ▼            │                      ▼
-        ┌───────────────┐    │              [Physics-Informed
-        │               │    │                    GNN]
-   [2D GNN]        [3D GNN]  │                      │
-        │               │    │                      │
-        └───────┬───────┘    │                      │
-                │            │                      │
-                ▼            │                      │
-    [Conformer Attention]    │                      │
-    (protein-context-based)  │                      │
-                │            │                      │
-                └────────────┼──────────────────────┘
+                    ┌─────────────────────────────────────────┐
+                    │          INPUT DATA                     │
+                    └─────────────────────────────────────────┘
+                              │               │
+                    ┌─────────┴─────┐         │
+                    │               │         │
+              Ligand SMILES    Ligand SMILES  Protein PDB
+                    │               │         │
+                    ▼               ▼         ▼
+          ┌──────────────────┐  ┌─────┐  ┌─────────┐
+          │ Conformer        │  │ECFP │  │ ESM-2   │
+          │ Generation (5x)  │  │Gen  │  │ PLM     │
+          └──────────────────┘  └─────┘  └─────────┘
+                    │               │         │
+                    ▼               │         ▼
+          ┌──────────────────┐      │    ┌──────────────┐
+          │  2D GNN  3D GNN  │      │    │   Residue    │
+          │    (GAT)  (Rad)  │      │    │  Embeddings  │
+          └──────────────────┘      │    └──────────────┘
+                    │               │         │
+                    ▼               │         ▼
+          ┌──────────────────┐      │    ┌──────────────┐
+          │   Conformer      │      │    │  Physics-    │
+          │   Attention      │◄─────┘    │  Informed    │
+          │   (Context)      │           │     GNN      │
+          └──────────────────┘           └──────────────┘
+                    │                         │
+                    └────────┬────────────────┘
+                             ▼
+                    ┌─────────────────┐
+                    │  Hierarchical   │
+                    │ Cross-Attention │
+                    │ (Ligand-Protein)│
+                    └─────────────────┘
                              │
                              ▼
-
-INTERACTION LAYER
-═══════════════════════════════════════════════════════════════
-
-              [Hierarchical Cross-Attention]
-               (Ligand-Protein Interactions)
+          ┌──────────────────────────────────────────┐
+          │      5-Stream Fusion MLP                 │
+          │  (Interaction + Protein + Ligand +       │
+          │         Physics + ECFP)                  │
+          └──────────────────────────────────────────┘
                              │
                              ▼
-
-FUSION LAYER
-═══════════════════════════════════════════════════════════════
-
-             [Multi-Stream Fusion MLP]
-    (5 streams: interaction, protein, ligand,
-              physics, ECFP)
+                    ┌─────────────────┐
+                    │    KAN Head     │
+                    │   (Regression)  │
+                    └─────────────────┘
                              │
                              ▼
-                        [KAN Head]
+                    ┌─────────────────┐
+                    │  DL Prediction  │
+                    └─────────────────┘
                              │
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+        ┌──────────┐                  ┌──────────┐
+        │    DL    │                  │ XGBoost  │
+        │ (w * p1) │                  │((1-w)*p2)│
+        └──────────┘                  └──────────┘
+              │                             │
+              └──────────────┬──────────────┘
                              ▼
-                    DL Affinity Prediction
-                             │
-                             ▼
-
-ENSEMBLE LAYER
-═══════════════════════════════════════════════════════════════
-
-        ┌────────────────┴────────────────┐
-        │                                 │
-        ▼                                 ▼
-   DL Model                         [XGBoost]
-   (weight: w)                    (weight: 1-w)
-        │                                 │
-        └────────────────┬────────────────┘
-                         │
-                         ▼
-              Final Affinity Prediction
-                  (-logKd/Ki)
+                    ┌─────────────────┐
+                    │ Final Affinity  │
+                    │  (-logKd/Ki)    │
+                    └─────────────────┘
 ```
 
 ---
