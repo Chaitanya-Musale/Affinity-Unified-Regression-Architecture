@@ -366,10 +366,7 @@ AURA/
 ├── main.py                      # Main execution script
 ├── config.py                    # Global configuration and hyperparameters
 ├── requirements.txt             # Python dependencies
-├── README.md                    # This file
-├── aura_standalone.py           # Standalone version of the framework
-├── src.py                       # Source utilities
-├── testing.py                   # Testing and evaluation scripts
+├── README.md                    
 │
 ├── data/                        # Data processing modules
 │   ├── __init__.py
