@@ -1,0 +1,39 @@
+# AURA Framework - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core ML and Data
+pandas>=1.5.0
+numpy>=1.23.0
+scikit-learn>=1.2.0
+scipy>=1.10.0
+
+# Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+torch-geometric>=2.3.0
+torch-scatter
+torch-sparse
+torch-cluster
+torch-spline-conv
+
+# Transformers and NLP
+transformers>=4.30.0
+sentencepiece>=0.1.99
+accelerate>=0.20.0
+
+# Cheminformatics
+rdkit>=2022.9.1
+biopython>=1.81
+
+# Visualization and Analysis
+matplotlib>=3.7.0
+seaborn>=0.12.0
+tqdm>=4.65.0
+shap>=0.42.0
+nglview>=3.0.0
+
+# Tree Models
+xgboost>=1.7.0
+
+# Geometric Deep Learning
+e3nn>=0.5.0
