@@ -89,25 +89,73 @@ These streams are integrated through:
 ### Architecture Diagram (Conceptual)
 
 ```
-Ligand SMILES → [Conformer Generation] → Multiple 3D Conformers
-                                            ↓
-                                    [2D GNN] [3D GNN]
-                                            ↓
-                                   [Conformer Attention]
-                                            ↓
-Protein PDB → [ESM-2] → Residue Embeddings
-                            ↓                ↓
-                    [Physics GNN]    [Cross-Attention]
-                            ↓                ↓
-SMILES → [ECFP] ──────────────→ [Fusion MLP] ← DL Features
-                                      ↓
-                                 [KAN Head]
-                                      ↓
-                            Binding Affinity Prediction
-                                      ↓
-                      [XGBoost Ensemble Combination]
-                                      ↓
-                            Final Affinity Prediction
+INPUT LAYER
+═══════════════════════════════════════════════════════════════
+
+Ligand SMILES                                    Protein PDB
+     │                                                │
+     └──────────┬─────────────┐                      │
+                │             │                      │
+                ▼             ▼                      ▼
+    [Conformer Gen]    [ECFP Encoder]         [ESM-2 PLM]
+         │                   │                      │
+         ▼                   │                      ▼
+   5 Conformers              │              Residue Embeddings
+         │                   │                      │
+         └──────┬────────┘   │                      │
+                │            │                      │
+                ▼            │                      ▼
+        ┌───────────────┐    │              [Physics-Informed
+        │               │    │                    GNN]
+   [2D GNN]        [3D GNN]  │                      │
+        │               │    │                      │
+        └───────┬───────┘    │                      │
+                │            │                      │
+                ▼            │                      │
+    [Conformer Attention]    │                      │
+    (protein-context-based)  │                      │
+                │            │                      │
+                └────────────┼──────────────────────┘
+                             │
+                             ▼
+
+INTERACTION LAYER
+═══════════════════════════════════════════════════════════════
+
+              [Hierarchical Cross-Attention]
+               (Ligand-Protein Interactions)
+                             │
+                             ▼
+
+FUSION LAYER
+═══════════════════════════════════════════════════════════════
+
+             [Multi-Stream Fusion MLP]
+    (5 streams: interaction, protein, ligand,
+              physics, ECFP)
+                             │
+                             ▼
+                        [KAN Head]
+                             │
+                             ▼
+                    DL Affinity Prediction
+                             │
+                             ▼
+
+ENSEMBLE LAYER
+═══════════════════════════════════════════════════════════════
+
+        ┌────────────────┴────────────────┐
+        │                                 │
+        ▼                                 ▼
+   DL Model                         [XGBoost]
+   (weight: w)                    (weight: 1-w)
+        │                                 │
+        └────────────────┬────────────────┘
+                         │
+                         ▼
+              Final Affinity Prediction
+                  (-logKd/Ki)
 ```
 
 ---
